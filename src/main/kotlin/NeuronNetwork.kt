@@ -20,7 +20,7 @@ class NeuronNetwork(
                 val neurons = Array(neuronCount) {
                     // Get amount of neurons in previous layer
                     // The previous neurons will be fet to the current layer
-                    val incomingNeuronsCount = layerSizes[i]
+                    val incomingNeuronsCount = layerSizes[i - 1]
                     Neuron(incomingNeuronsCount)
                 }
                 layers.add(Layer(neurons))
