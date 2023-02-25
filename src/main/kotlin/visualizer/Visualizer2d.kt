@@ -5,6 +5,7 @@ import Neuron
 import NeuronNetwork
 import kotlinx.coroutines.*
 import me.tongfei.progressbar.ProgressBar
+import java.awt.BasicStroke
 import java.awt.Color
 import java.awt.Dimension
 import java.awt.Panel
@@ -12,12 +13,15 @@ import java.awt.image.BufferedImage
 import javax.swing.*
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 class Visualizer2d(
     private val neuronNetwork: NeuronNetwork,
-    xRange: IntRange,
-    yRange: IntRange
+    val xRange: IntRange,
+    val yRange: IntRange
 ) {
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
     //private val zoomFactor = 1 / zoom
@@ -41,7 +45,8 @@ class Visualizer2d(
 
     private suspend fun renderImage(): BufferedImage {
         renderDecisionBoundary()
-        //if (dataPoints.isNotEmpty()) renderDataPoints()
+        renderAxis()
+        if (dataPoints.isNotEmpty()) renderDataPoints()
 
         return image
     }
@@ -53,11 +58,10 @@ class Visualizer2d(
         for (y in 0 until height) {
             val job = coroutineScope.async {
                 for (x in 0 until width) {
-                    val inputs = listOf(x.toDouble(), y.toDouble())
+                    val inputs = listOf(x.toDouble() / width * 3, y.toDouble() / height * 3)
                     val outputs = neuronNetwork.predict(inputs)
 
-                    val colour = if (outputs[0] > outputs[1]) Color.GREEN else Color.RED
-                    image.setRGB(x, y, colour.rgb)
+                    image.setRGB(x, y, getColor(outputs).rgb)
                 }
                 progressBar.step()
                 progressBar.refresh()
@@ -68,14 +72,50 @@ class Visualizer2d(
         progressBar.close()
     }
 
+    private fun getColor(outputs: List<Double>): Color {
+
+        return if (outputs[0] > outputs[1]) Color.RED
+        else Color.GREEN
+
+        var alpha = outputs[0] - outputs[1]
+        alpha = max(alpha, -1.0)
+        alpha = min(alpha, 1.0)
+        alpha = (1.0 + alpha) / 2.0
+        val r = (alpha * 0xFF).toInt()
+        val g = ((1 - alpha) * 0xFF).toInt()
+        val b = 0
+        return Color(r, g, b)
+    }
+
+    private fun renderAxis() {
+        val graphics = image.createGraphics()
+        graphics.color = Color.BLACK
+        graphics.stroke = BasicStroke(2.0f)
+        // Y Axis
+        val xOffset = xRange.first
+        if (xOffset < 0) { // Y-axis would be visible
+            val xLevel = abs(xOffset)
+            graphics.drawLine(xLevel, 0, xLevel, height)
+        }
+        // X Axis
+        val yOffset = yRange.first
+        if (yOffset < 0) { // X-axis would be visible
+            val yLevel = height - abs(yOffset)
+            graphics.drawLine(0, yLevel, width, yLevel)
+        }
+    }
+
     private fun renderDataPoints() {
-        val radius = 1
+        val radius = 2
         val graphics = image.graphics
         graphics.color = Color.WHITE
         dataPoints.forEach {
             val x = it.x.roundToInt()
             val y = it.y.roundToInt()
-            graphics.drawOval(x - radius, y - radius, radius * 2, radius * 2)
+
+            val relativeX = xRange.first * -1 + x
+            val relativeY = height - (yRange.first * -1 + y)
+            graphics.drawOval(relativeX - radius, relativeY - radius, radius * 2, radius * 2)
         }
     }
 
@@ -140,7 +180,7 @@ class Visualizer2d(
             document.addDocumentListener(inputListener)
         }
 
-        val slider = JSlider(-1 * 10, 1 * 10, 0).apply {
+        val slider = JSlider(-3 * 10, 3 * 10, 0).apply {
             addChangeListener {
                 val numberValue = value / 10.0
 
