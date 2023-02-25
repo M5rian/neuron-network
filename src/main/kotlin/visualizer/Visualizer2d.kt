@@ -106,16 +106,17 @@ class Visualizer2d(
     }
 
     private fun renderDataPoints() {
-        val radius = 2
+        val radius = 4
         val graphics = image.graphics
-        graphics.color = Color.WHITE
         dataPoints.forEach {
             val x = it.x.roundToInt()
             val y = it.y.roundToInt()
 
             val relativeX = xRange.first * -1 + x
             val relativeY = height - (yRange.first * -1 + y)
-            graphics.drawOval(relativeX - radius, relativeY - radius, radius * 2, radius * 2)
+            val colour = if (it.classification == 1) Color.BLACK else Color.WHITE
+            graphics.color = colour
+            graphics.fillOval(relativeX - radius, relativeY - radius, radius * 2, radius * 2)
         }
     }
 
