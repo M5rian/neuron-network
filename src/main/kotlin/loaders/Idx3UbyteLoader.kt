@@ -1,3 +1,8 @@
+package loaders
+
+import ByteReader
+import Image
+import ImageSet
 import me.tongfei.progressbar.ProgressBar
 
 object Idx3UbyteLoader {

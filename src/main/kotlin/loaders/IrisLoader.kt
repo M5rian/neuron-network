@@ -1,3 +1,5 @@
+package loaders
+
 enum class PlantClassification {
     SETOSA,
     VERSICOLOR,
