@@ -1,3 +1,6 @@
+import loaders.CustomDataLoader
+import visualizer.DataPoint
+import visualizer.Visualizer2d
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -30,9 +33,9 @@ data class Image(
 
 suspend fun main() {
     /*
-    val trainingImages = Idx3UbyteLoader.loadImageSet("train-images-idx3-ubyte")
+    val trainingImages = loaders.Idx3UbyteLoader.loadImageSet("train-images-idx3-ubyte")
     println("Image size = ${trainingImages.width}x${trainingImages.height} (${trainingImages.count}x)")
-    val trainingLabels = Idx3UbyteLoader.loadLabelSet("train-labels.idx1-ubyte")
+    val trainingLabels = loaders.Idx3UbyteLoader.loadLabelSet("train-labels.idx1-ubyte")
     println("Labels = ")
     for (i in 0 until 10) {
         println(trainingLabels[i])
@@ -40,23 +43,19 @@ suspend fun main() {
     val neuronNetwork = NeuronNetwork.fromLayerSizes(trainingImages.pixels, 2, 10)
     */
 
-    val neuronNetwork = NeuronNetwork.fromLayerSizes(2, 2, 2)
-    val visualizer = visualizer.Visualizer2d(neuronNetwork, -50..1200, -50..500)
-    visualizer.render()
-
-
     /*
-    val trainingSamples = IrisLoader
-        .loadPlantSet("datasets/iris/iris.data")
-        .filter { it.classification != PlantClassification.SETOSA }
+    val neuronNetwork = NeuronNetwork.fromLayerSizes(2, 2, 2)
+    val visualizer = visualizer.Visualizer2d(neuronNetwork, -100..1200, -100..500)
+    visualizer.render()
+    */
+
+    val trainingSamples = CustomDataLoader().loadSamples()
 
     val neuronNetwork = NeuronNetwork.fromLayerSizes(2, 2, 2)
-    val visualizer = Visualizer2d(neuronNetwork, 0 until 15, 0 until 25, 0.02)
+    val visualizer = Visualizer2d(neuronNetwork, -100 until 1000, -100 until 750)
     visualizer.dataPoints(trainingSamples) {
-        val classification = if (it.classification == PlantClassification.VIRGINICA) 1 else -1
-        DataPoint(classification, it.petalLength, it.sepalLength)
+        DataPoint(it.classification.toInt(), it.x, it.y)
     }
     visualizer.render()
-     */
 }
 
