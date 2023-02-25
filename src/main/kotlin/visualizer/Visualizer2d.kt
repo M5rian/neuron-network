@@ -29,10 +29,13 @@ class Visualizer2d(
     private val width = xRange.last - xRange.first
     private val height = yRange.last - yRange.first
 
+    private val lossLabel = JLabel("Loss = ?")
     private val image = BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
     private lateinit var imageLabel: JLabel
 
     private val dataPoints = mutableListOf<DataPoint>()
+    private val dataPointsAsInputs = mutableListOf<List<Double>>()
+    private val dataPointsAsExpectedOutput = mutableListOf<List<Double>>()
 
     init {
         if (neuronNetwork.inputs != 2) throw IllegalStateException("Input layer must have 2 neurons")
@@ -41,6 +44,11 @@ class Visualizer2d(
 
     fun <T> dataPoints(trainingSamples: List<T>, function: (T) -> DataPoint) {
         dataPoints.addAll(trainingSamples.map(function))
+        dataPointsAsInputs.addAll(dataPoints.map { listOf(it.x, it.y) })
+        dataPointsAsExpectedOutput.addAll(dataPoints.map {
+            if (it.classification == 1) return@map listOf(0.0, 1.0)
+            else return@map listOf(1.0, 0.0)
+        })
     }
 
     private suspend fun renderImage(): BufferedImage {
@@ -126,6 +134,8 @@ class Visualizer2d(
             // Visualization image
             imageLabel = JLabel(ImageIcon(renderImage()))
             add(imageLabel)
+            // Loss
+            add(lossLabel)
             // Bias and weight settings
             neuronNetwork.layers.forEachIndexed { layerIndex, layer ->
                 renderLayer(layerIndex, layer)
@@ -170,6 +180,9 @@ class Visualizer2d(
             coroutineScope.launch {
                 imageLabel.icon = ImageIcon(renderImage())
                 imageLabel.repaint()
+
+                val loss = neuronNetwork.averageLoss(dataPointsAsInputs, dataPointsAsExpectedOutput)
+                lossLabel.text = "Loss = $loss"
             }
         }
 
@@ -189,13 +202,10 @@ class Visualizer2d(
                 inputListener.ignore = true
                 input.text = numberValue.toString()
 
-                if (!valueIsAdjusting) {
-                    coroutineScope.launch {
-                        inputListener.ignore = false
-                        updateFunction.invoke(numberValue)
-                        imageLabel.icon = ImageIcon(renderImage())
-                        imageLabel.repaint()
-                    }
+                if (!valueIsAdjusting) coroutineScope.launch {
+                    inputListener.ignore = false
+                    updateFunction.invoke(numberValue)
+                    rerenderFunction.invoke()
                 }
             }
         }

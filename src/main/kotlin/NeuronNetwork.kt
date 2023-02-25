@@ -46,7 +46,7 @@ class NeuronNetwork(
         return layerInputs // Last inputs are the final outputs
     }
 
-    fun loss(input: List<Double>, expectedOutput: List<Double>): Double {
+    private fun loss(input: List<Double>, expectedOutput: List<Double>): Double {
         val outputs = predict(input)
         val outputLayer = layers.last()
         val loss = outputLayer.neurons.mapIndexed { i, neuron ->
@@ -55,12 +55,14 @@ class NeuronNetwork(
         return loss
     }
 
-    private fun normalize(
-        inputs: List<Double>,
-        min: Double,
-        max: Double
-    ): List<Double> = inputs.map { x ->
-        (x - min) / (x - max) * 2 - 1
+    fun averageLoss(inputs: List<List<Double>>, expectedOutputs: List<List<Double>>): Double {
+        var loss = 0.0
+        for (i in inputs.indices) {
+            val input = inputs[i]
+            val expectedOutput = expectedOutputs[i]
+            loss += loss(input, expectedOutput)
+        }
+        return loss / inputs.size
     }
 
 }
