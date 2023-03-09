@@ -6,6 +6,7 @@ import getColour
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.async
 import java.awt.BasicStroke
 import java.awt.Color
 import java.awt.image.BufferedImage
@@ -34,32 +35,23 @@ class ImageRenderer(
 
     private suspend fun renderDecisionBoundary() {
         val jobs = mutableListOf<Deferred<Unit>>()
-        for (xCoordinate in 0 until height) {
+        for (yPosition in 0 until height) {
+            val yValue = (yRange.first + yPosition).toDouble()
+            val yValueDrawnRight = yRange.last - yPosition - 1
 
-            for (yCoordinate in 0 until width) {
-                val xValue = (xRange.first + xCoordinate).toDouble()
-                val yValue = (yRange.first + yCoordinate).toDouble()
+            val job = coroutineScope.async {
+                for (xPosition in 0 until width) {
+                    val xValue = (xRange.first + xPosition).toDouble()
 
-                val yValueDrawnRight = yRange.last - yCoordinate- 1
+                    //println("$xValue x $yValueDrawnRight")
 
-                //println("$xValue x $yValueDrawnRight")
+                    val inputs = neuronNetwork.normalize(listOf(xValue, yValue), listOf(width.toDouble(), height.toDouble()))
+                    val outputs = neuronNetwork.predict(inputs)
 
-                val inputs = neuronNetwork.normalize(listOf(xValue, yValue), listOf(width.toDouble(), height.toDouble()))
-                val outputs = neuronNetwork.predict(inputs)
-
-                if (xCoordinate == 100 && yCoordinate == 400) {
-                    /*
-                    println("PIXEL WERT = ")
-                    println("x = $xCoordinate (${inputs[0]})")
-                    println("y = $yCoordinate (${inputs[1]})")
-                    println("Ich male = ${getColour(outputs)}")
-                    println("Output = ${getColour(outputs)}")
-                    */
+                    image.setRGB(xPosition, yValueDrawnRight, getColour(outputs).rgb)
                 }
-
-                image.setRGB(xCoordinate, yValueDrawnRight , getColour(outputs).rgb)
-
             }
+            jobs.add(job)
 
         }
 
@@ -103,7 +95,7 @@ class ImageRenderer(
 
             val relativeX = xRange.first * -1 + x
             val relativeY = height - (yRange.first * -1 + y)
-            val colour = if (it.outputs[0] == 1.0) Color(13, 252, 121) else Color(255, 87, 112)
+            val colour = if (it.outputs[0] == 1.0) Color(0, 222, 96) else Color(255, 87, 112)
             graphics.color = colour
             graphics.fillOval(relativeX - radius, relativeY - radius, radius * 2, radius * 2)
         }
