@@ -1,6 +1,6 @@
 import loaders.CustomDataLoader
-import visualizer.DataPoint
 import visualizer.Visualizer2d
+import java.awt.Color
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
@@ -49,13 +49,25 @@ suspend fun main() {
     visualizer.render()
     */
 
-    val trainingSamples = CustomDataLoader().loadSamples()
+    val trainingSamples = CustomDataLoader("custom-data-linear").loadSamples()
+    //val neuronNetwork = NeuronNetwork.fromLayerSizes(2, 3, 5, 2)
+    val neuronNetwork = NeuronNetwork.fromLayerSizes(2, 2)
 
-    val neuronNetwork = NeuronNetwork.fromLayerSizes(2, 2, 2)
-    val visualizer = Visualizer2d(neuronNetwork, -100 until 1000, -100 until 750)
+    val visualizer = Visualizer2d(neuronNetwork, 0 .. 500, 0 .. 500)
     visualizer.dataPoints(trainingSamples) {
-        DataPoint(it.classification.toInt(), it.x, it.y)
+        TrainingData(
+            inputs = listOf(it.x, it.y),
+            outputs = if (it.classification == 1.toByte()) listOf(1.0, 0.0) else listOf(0.0, 1.0)
+        )
     }
-    visualizer.render()
+    visualizer.open()
 }
 
+fun getColour(outputs: List<Double>): Color {
+    return if (outputs.indexOf(outputs.max()) == 0) Color.GREEN
+    else if (outputs.indexOf(outputs.max()) == 1) Color.RED
+    else {
+        println("hä? inputs = $outputs")
+        Color.GRAY
+    }
+}

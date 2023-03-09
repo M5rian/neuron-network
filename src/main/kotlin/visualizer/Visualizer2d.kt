@@ -1,235 +1,154 @@
 package visualizer
 
-import Layer
-import Neuron
 import NeuronNetwork
-import kotlinx.coroutines.*
-import me.tongfei.progressbar.ProgressBar
-import java.awt.BasicStroke
-import java.awt.Color
-import java.awt.Dimension
-import java.awt.Panel
-import java.awt.image.BufferedImage
+import TrainingData
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.launch
+import java.util.concurrent.ForkJoinPool
 import javax.swing.*
-import javax.swing.event.DocumentEvent
-import javax.swing.event.DocumentListener
-import kotlin.math.abs
-import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.roundToInt
 
 class Visualizer2d(
     private val neuronNetwork: NeuronNetwork,
-    val xRange: IntRange,
-    val yRange: IntRange
+    xRange: IntRange,
+    yRange: IntRange
 ) {
-    private val coroutineScope = CoroutineScope(Dispatchers.IO)
-    //private val zoomFactor = 1 / zoom
-
-    private val width = xRange.last - xRange.first
-    private val height = yRange.last - yRange.first
-
-    private val lossLabel = JLabel("Loss = ?")
-    private val image = BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB)
-    private lateinit var imageLabel: JLabel
-
-    private val dataPoints = mutableListOf<DataPoint>()
-    private val dataPointsAsInputs = mutableListOf<List<Double>>()
-    private val dataPointsAsExpectedOutput = mutableListOf<List<Double>>()
 
     init {
         if (neuronNetwork.inputs != 2) throw IllegalStateException("Input layer must have 2 neurons")
         if (neuronNetwork.layers.last().neurons.size != 2) throw IllegalStateException("Output layer must have 2 neurons")
     }
 
-    fun <T> dataPoints(trainingSamples: List<T>, function: (T) -> DataPoint) {
-        dataPoints.addAll(trainingSamples.map(function))
-        dataPointsAsInputs.addAll(dataPoints.map { listOf(it.x, it.y) })
-        dataPointsAsExpectedOutput.addAll(dataPoints.map {
-            if (it.classification == 1) return@map listOf(0.0, 1.0)
-            else return@map listOf(1.0, 0.0)
-        })
+    private val coroutineScope = CoroutineScope(ForkJoinPool.commonPool().asCoroutineDispatcher())
+    private val imageRenderer = ImageRenderer(xRange, yRange, neuronNetwork)
+    private val inputRenderer = InputRenderer(this, neuronNetwork)
+
+    private val trainingData = mutableListOf<TrainingData>()
+    private val normalizedTrainingData: List<TrainingData>
+        get() = neuronNetwork.normalizeSet(
+            trainingData, listOf(imageRenderer.width.toDouble(), imageRenderer.height.toDouble())
+        )
+
+    private val updateButton = JButton("Update!").apply { initializeUpdateButton(this) }
+    private val learnOnceButton = JButton("Learn once").apply { initializeLearnOnceButton(this) }
+    private val learnButton = JButton("Learn!").apply { initializeLearnButton(this) }
+    private val lossLabel = JLabel("Loss = ?")
+    private val correctLabel = JLabel("Correct = ?")
+    private lateinit var imageLabel: JLabel
+
+    fun <T> dataPoints(trainingSamples: List<T>, function: (T) -> TrainingData) {
+        trainingData.addAll(trainingSamples.map(function))
     }
 
-    private suspend fun renderImage(): BufferedImage {
-        renderDecisionBoundary()
-        renderAxis()
-        if (dataPoints.isNotEmpty()) renderDataPoints()
-
-        return image
-    }
-
-    private suspend fun renderDecisionBoundary() {
-        val progressBar = ProgressBar("render image", height.toLong())
-
-        val jobs = mutableListOf<Deferred<Unit>>()
-        for (y in 0 until height) {
-            val job = coroutineScope.async {
-                for (x in 0 until width) {
-                    val inputs = listOf(x.toDouble() / width * 3, y.toDouble() / height * 3)
-                    val outputs = neuronNetwork.predict(inputs)
-
-                    image.setRGB(x, y, getColor(outputs).rgb)
-                }
-                progressBar.step()
-                progressBar.refresh()
-            }
-            jobs.add(job)
-        }
-        awaitAll(*jobs.toTypedArray())
-        progressBar.close()
-    }
-
-    private fun getColor(outputs: List<Double>): Color {
-
-        return if (outputs[0] > outputs[1]) Color.RED
-        else Color.GREEN
-
-        var alpha = outputs[0] - outputs[1]
-        alpha = max(alpha, -1.0)
-        alpha = min(alpha, 1.0)
-        alpha = (1.0 + alpha) / 2.0
-        val r = (alpha * 0xFF).toInt()
-        val g = ((1 - alpha) * 0xFF).toInt()
-        val b = 0
-        return Color(r, g, b)
-    }
-
-    private fun renderAxis() {
-        val graphics = image.createGraphics()
-        graphics.color = Color.BLACK
-        graphics.stroke = BasicStroke(2.0f)
-        // Y Axis
-        val xOffset = xRange.first
-        if (xOffset < 0) { // Y-axis would be visible
-            val xLevel = abs(xOffset)
-            graphics.drawLine(xLevel, 0, xLevel, height)
-        }
-        // X Axis
-        val yOffset = yRange.first
-        if (yOffset < 0) { // X-axis would be visible
-            val yLevel = height - abs(yOffset)
-            graphics.drawLine(0, yLevel, width, yLevel)
-        }
-    }
-
-    private fun renderDataPoints() {
-        val radius = 4
-        val graphics = image.graphics
-        dataPoints.forEach {
-            val x = it.x.roundToInt()
-            val y = it.y.roundToInt()
-
-            val relativeX = xRange.first * -1 + x
-            val relativeY = height - (yRange.first * -1 + y)
-            val colour = if (it.classification == 1) Color.BLACK else Color.WHITE
-            graphics.color = colour
-            graphics.fillOval(relativeX - radius, relativeY - radius, radius * 2, radius * 2)
-        }
-    }
-
-    suspend fun render() = JFrame().apply {
+    suspend fun open() = JFrame().apply {
         add(JPanel().apply {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
+
+            add(updateButton)
+            add(learnOnceButton)
+            add(learnButton)
+
             // Visualization image
-            imageLabel = JLabel(ImageIcon(renderImage()))
+            val image = imageRenderer.apply {
+                render()
+                renderDataPoints(trainingData)
+            }.getImage()
+            imageLabel = JLabel(ImageIcon(image))
             add(imageLabel)
-            // Loss
-            add(lossLabel)
+
+            add(lossLabel.apply {
+                val loss = neuronNetwork.averageCost(normalizedTrainingData)
+                text = "Loss = $loss"
+            })
+            add(correctLabel.apply {
+                val correctSamples = neuronNetwork.test(normalizedTrainingData)
+                text = "Correct = $correctSamples / ${trainingData.size}"
+            })
+
             // Bias and weight settings
-            neuronNetwork.layers.forEachIndexed { layerIndex, layer ->
-                renderLayer(layerIndex, layer)
-            }
+            inputRenderer.render(this)
         })
         isVisible = true
     }
 
-    private fun JPanel.renderLayer(layerIndex: Int, layer: Layer) {
-        add(JLabel("Layer $layerIndex"))
-        layer.neurons.forEachIndexed { neuronIndex, neuron ->
-            renderNeuron(neuronIndex, neuron)
+    suspend fun rerender() {
+        val image = imageRenderer.apply {
+            render()
+            renderDataPoints(trainingData)
+        }.getImage()
+        imageLabel.icon = ImageIcon(image)
+        imageLabel.repaint()
+
+        val loss = neuronNetwork.averageCost(normalizedTrainingData)
+        lossLabel.text = "Loss = $loss"
+
+        val correctSamples = neuronNetwork.test(normalizedTrainingData)
+        correctLabel.text = "Correct = $correctSamples / ${trainingData.size}"
+    }
+
+    private fun initializeLearnOnceButton(button: JButton) {
+        button.addActionListener {
+            neuronNetwork.learn(normalizedTrainingData, 0.001)
+            coroutineScope.launch { rerender() }
         }
     }
 
-    private fun JPanel.renderNeuron(neuronIndex: Int, neuron: Neuron) {
-        add(JLabel("Neuron $neuronIndex"))
+    private fun initializeLearnButton(button: JButton) {
+        var learning = false
 
-        add(Panel().apply {
-            layout = BoxLayout(this, BoxLayout.X_AXIS)
+        var learningJob: Job? = null
+        var rerenderJob: Job? = null
 
-            add(JLabel("Bias"))
-            addNumberInput(neuron.bias) { neuron.bias = it }
-        })
+        fun startLearning() {
+            button.text = "Stop!"
 
-        neuron.weights.forEachIndexed { weightIndex, weight ->
-            renderWeights(neuron, weightIndex, weight)
-        }
-    }
-
-    private fun JPanel.renderWeights(neuron: Neuron, weightIndex: Int, weight: Double) {
-        add(Panel().apply {
-            layout = BoxLayout(this, BoxLayout.X_AXIS)
-
-            add(JLabel("Weight $weightIndex"))
-            addNumberInput(weight) { neuron.weights[weightIndex] = it }
-        })
-    }
-
-    private fun Panel.addNumberInput(defaultNumber: Double, updateFunction: (Double) -> Unit) {
-        val rerenderFunction: () -> Unit = {
-            coroutineScope.launch {
-                imageLabel.icon = ImageIcon(renderImage())
-                imageLabel.repaint()
-
-                val loss = neuronNetwork.averageLoss(dataPointsAsInputs, dataPointsAsExpectedOutput)
-                lossLabel.text = "Loss = $loss"
+            learningJob = coroutineScope.launch {
+                while (true) {
+                    neuronNetwork.learn(normalizedTrainingData, 0.001)
+                }
             }
-        }
-
-        var inputListener: InputListener
-        val input = JTextField(defaultNumber.toString()).apply {
-            minimumSize = Dimension(200, 35)
-
-            inputListener = InputListener(this, updateFunction, rerenderFunction)
-            document.addDocumentListener(inputListener)
-        }
-
-        val slider = JSlider(-3 * 10, 3 * 10, 0).apply {
-            addChangeListener {
-                val numberValue = value / 10.0
-
-                // Update text input without dispatching an event
-                inputListener.ignore = true
-                input.text = numberValue.toString()
-
-                if (!valueIsAdjusting) coroutineScope.launch {
-                    inputListener.ignore = false
-                    updateFunction.invoke(numberValue)
-                    rerenderFunction.invoke()
+            rerenderJob = coroutineScope.launch {
+                while (true) {
+                    rerender()
+                    /*
+                    forEachWeight { layerIndex, neuronIndex, weightIndex, weight ->
+                        val inputManager = inputRenderer.weightInputs[layerIndex][neuronIndex][weightIndex]
+                        inputManager.input.text = weight.toString()
+                       // inputManager.slider.value = 0
+                    }*/
                 }
             }
         }
 
-        add(input)
-        add(slider)
+        fun stopLearning() {
+            button.text = "Learn!"
+            learningJob?.cancel()
+            rerenderJob?.cancel()
+        }
+
+        button.addActionListener {
+            if (learning) stopLearning()
+            else startLearning()
+
+            learning = !learning
+        }
     }
 
-    private class InputListener(
-        private val textField: JTextField,
-        private val updateFunction: (Double) -> Unit,
-        private val rerenderFunction: () -> Unit
-    ) : DocumentListener {
-        var ignore = false
+    private fun initializeUpdateButton(button: JButton) {
+        button.addActionListener {
+            coroutineScope.launch { rerender() }
+        }
+    }
 
-        override fun insertUpdate(e: DocumentEvent?) = update()
-        override fun removeUpdate(e: DocumentEvent?) = update()
-        override fun changedUpdate(e: DocumentEvent?) = update()
-        private fun update() {
-            val number = textField.text.toDoubleOrNull() ?: 0.0
-            if (ignore) return
-
-            updateFunction.invoke(number)
-            rerenderFunction.invoke()
+    private fun forEachWeight(function: (layer: Int, neuron: Int, weight: Int, Double) -> Unit) {
+        for (layer in neuronNetwork.layers.indices) {
+            for (neuron in neuronNetwork.layers[layer].neurons.indices) {
+                for (weight in neuronNetwork.layers[layer].neurons[neuron].weights.indices) {
+                    val weightValue = neuronNetwork.layers[layer].neurons[neuron].weights[weight]
+                    function.invoke(layer, neuron, weight, weightValue)
+                }
+            }
         }
     }
 
