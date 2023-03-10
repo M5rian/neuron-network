@@ -3,10 +3,7 @@ package visualizer
 import NeuronNetwork
 import TrainingData
 import getColour
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.asCoroutineDispatcher
-import kotlinx.coroutines.async
+import kotlinx.coroutines.*
 import java.awt.BasicStroke
 import java.awt.Color
 import java.awt.image.BufferedImage
@@ -43,8 +40,6 @@ class ImageRenderer(
                 for (xPosition in 0 until width) {
                     val xValue = (xRange.first + xPosition).toDouble()
 
-                    //println("$xValue x $yValueDrawnRight")
-
                     val inputs = neuronNetwork.normalize(listOf(xValue, yValue), listOf(width.toDouble(), height.toDouble()))
                     val outputs = neuronNetwork.predict(inputs)
 
@@ -52,9 +47,8 @@ class ImageRenderer(
                 }
             }
             jobs.add(job)
-
         }
-
+        awaitAll(*jobs.toTypedArray())
     }
 
     private fun getGradient(outputs: List<Double>): Color {
