@@ -30,7 +30,7 @@ class Neuron(
     }
 
     private fun activationFunction(weightedInput: Double): Double {
-        return ActivationFunction.LINEAR.evaluate(weightedInput)
+        return ActivationFunction.SIGMOID.evaluate(weightedInput)
     }
 
     fun loss(output: Double, expectedOutput: Double): Double {
