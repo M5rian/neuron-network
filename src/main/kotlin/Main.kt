@@ -49,11 +49,11 @@ suspend fun main() {
     visualizer.render()
     */
 
-    val trainingSamples = CustomDataLoader("custom-data-linear").loadSamples()
+    val trainingSamples = CustomDataLoader("custom-data").loadSamples()
     //val neuronNetwork = NeuronNetwork.fromLayerSizes(2, 3, 5, 2)
-    val neuronNetwork = NeuronNetwork.fromLayerSizes(2, 2)
+    val neuronNetwork = NeuronNetwork.fromLayerSizes(2, 4, 2, 3, 2)
 
-    val visualizer = Visualizer2d(neuronNetwork, 0 .. 500, 0 .. 500)
+    val visualizer = Visualizer2d(neuronNetwork, 0..1100, 0..800)
     visualizer.dataPoints(trainingSamples) {
         TrainingData(
             inputs = listOf(it.x, it.y),
