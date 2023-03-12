@@ -1,4 +1,4 @@
-package loaders
+package com.github.m5rian.loader
 
 import ByteReader
 import Image
@@ -33,7 +33,7 @@ object Idx3UbyteLoader {
                 for (column in 0 until columns) {
                     val ubyte = reader.readUByte()
                     pixels[row][column] = ubyte
-                    allPixels[row * 1 + column]
+                    allPixels[row * columns + column] = ubyte
                 }
             }
             val image = Image(pixels, allPixels)
