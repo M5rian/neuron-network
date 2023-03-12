@@ -1,30 +1,30 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
+    base
     kotlin("jvm") version "1.7.20"
-    application
+    kotlin("plugin.serialization") version "1.6.21"
 }
 
-group = "com.github.m5rian"
-version = "1.0-SNAPSHOT"
+allprojects {
+    group = "com.github.m5rian"
 
-repositories {
-    mavenCentral()
+    repositories {
+        mavenCentral()
+    }
+
+    tasks.withType<KotlinCompile> {
+        kotlinOptions.jvmTarget = "17"
+    }
 }
 
-dependencies {
-    implementation("org.jetbrains.kotlinx", "kotlinx-coroutines-core", "1.3.2")
-    implementation("me.tongfei", "progressbar", "0.9.4")
-}
+subprojects {
+    apply(plugin = "org.jetbrains.kotlin.jvm")
+    apply(plugin = "org.jetbrains.kotlin.plugin.serialization")
 
-tasks.test {
-    useJUnitPlatform()
-}
-
-tasks.withType<KotlinCompile> {
-    kotlinOptions.jvmTarget = "1.8"
-}
-
-application {
-    mainClass.set("MainKt")
+    dependencies {
+        implementation("org.jetbrains.kotlinx", "kotlinx-coroutines-core", "1.3.2")
+        implementation("org.jetbrains.kotlinx", "kotlinx-serialization-core", "1.5.0")
+        implementation("me.tongfei", "progressbar", "0.9.4")
+    }
 }
