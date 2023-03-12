@@ -1,13 +1,24 @@
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import java.io.File
+
 /**
  * @property inputs
  * @property layers All layers except the first one.
  */
+@Serializable
 class NeuronNetwork(
     val inputs: Int,
     val layers: List<Layer>
 ) {
 
     companion object {
+        private val json = Json {
+            ignoreUnknownKeys = true
+        }
+
         /**
          * @param layerSizes Amount of neurons in each layer.
          * @return Creates a new neuron network with the dedicated layers.
@@ -27,6 +38,23 @@ class NeuronNetwork(
             }
             return NeuronNetwork(layerSizes[0], layers)
         }
+
+        fun fromFile(filePath: String): NeuronNetwork? {
+            return try {
+                val text = File(filePath).inputStream().bufferedReader().use { it.readText() }
+                val neuronNetwork = json.decodeFromString<NeuronNetwork>(text)
+                neuronNetwork
+            } catch (e: NullPointerException) {
+                null
+            }
+        }
+    }
+
+    fun toFile(filePath: String) {
+        val file = File(filePath)
+        if (!file.exists()) file.createNewFile()
+        val text = json.encodeToString(this)
+        file.writeText(text)
     }
 
     /**

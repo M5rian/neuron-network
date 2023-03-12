@@ -1,3 +1,6 @@
+import kotlinx.serialization.Serializable
+
+@Serializable
 class Layer(
     val neurons: Array<Neuron>
 ) {

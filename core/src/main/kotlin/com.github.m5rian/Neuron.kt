@@ -1,3 +1,4 @@
+import kotlinx.serialization.Serializable
 import kotlin.random.Random
 
 /**
@@ -5,6 +6,7 @@ import kotlin.random.Random
  * @property weights The weight for each incoming neuron.
  * @property bias Bias value for this neuron.
  */
+@Serializable
 class Neuron(
     private val incomingNeurons: Int,
     val weights: DoubleArray = DoubleArray(incomingNeurons) { randomWeight() },
