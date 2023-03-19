@@ -1,8 +1,12 @@
+import kotlinx.coroutines.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import me.tongfei.progressbar.ProgressBar
 import java.io.File
+import java.io.FileWriter
+import java.util.concurrent.ForkJoinPool
 
 /**
  * @property inputs
@@ -52,9 +56,12 @@ class NeuronNetwork(
 
     fun toFile(filePath: String) {
         val file = File(filePath)
-        if (!file.exists()) file.createNewFile()
-        val text = json.encodeToString(this)
-        file.writeText(text)
+        FileWriter(file).use {
+            val text = json.encodeToString(this)
+            it.write(text)
+            it.close()
+            it.flush()
+        }
     }
 
     /**
@@ -105,51 +112,75 @@ class NeuronNetwork(
             val predictedOutputs = predict(it.inputs)
             val predictedOutput = predictedOutputs.indexOf(predictedOutputs.max())
             val output = it.outputs.indexOf(it.outputs.max())
-            /*
-            println("koordinaten von dem punkt = ")
-            println("inputs = ${it.inputs}")
-            println("Ich suche = ${getColour(it.outputs)}")
-            println("Ich habe = ${getColour(predictedOutputs)}")
-            */
             predictedOutput == output
         }
     }
 
-    fun learn(trainingData: List<TrainingData>, learnRate: Double) {
+    suspend fun learn(trainingData: List<TrainingData>, learnRate: Double) {
         val distance = 0.00001
         val originalCost = averageCost(trainingData)
 
-        layers.forEach { layer ->
-            layer.neurons.forEach { neuron ->
+        val coroutineScope = CoroutineScope(ForkJoinPool.commonPool().asCoroutineDispatcher())
+        val jobs = mutableListOf<Deferred<Unit>>()
+        val progressBar = ProgressBar("Train", layers.sumOf { it.neurons.size }.toLong())
 
-                val weights = neuron.weights
-                for (i in weights.indices) {
-                    weights[i] += distance
+        for (layerIndex in layers.indices) {
+            for (neuronIndex in layers[layerIndex].neurons.indices) {
+                jobs.add(coroutineScope.async {
+                    val neuronJobs = mutableListOf<Deferred<Unit>>()
 
-                    /* Next we calculate the slope of the cost function.
-                      This can be done by taking the 2 cost points and using them as y values.
-                      (y2 - y1) / (x2 - x1)
-                      We know the distance so the formula can be simplified to:
-                      (y2 - y1) / distance
-                    */
-                    val newCost = averageCost(trainingData)
-                    val slope = (newCost - originalCost) / distance
-                    neuron.costGradientWeights[i] = slope
+                    val weightsCount = layers[layerIndex].neurons[neuronIndex].weights.size
+                    for (i in 0 until weightsCount) {
+                        neuronJobs.add(coroutineScope.async {
+                            val modifiableNetwork = copy() // Make independent copy to not throw of other calculations
+                            val neuron = modifiableNetwork.layers[layerIndex].neurons[neuronIndex]
+                            val weights = neuron.weights
+                            weights[i] += distance
 
-                    weights[i] -= distance // Reset weight to not throw of next calculations
-                }
+                            /* Next we calculate the slope of the cost function.
+                              This can be done by taking the 2 cost points and using them as y values.
+                              (y2 - y1) / (x2 - x1)
+                              We know the distance so the formula can be simplified to:
+                              (y2 - y1) / distance
+                            */
+                            val newCost = modifiableNetwork.averageCost(trainingData)
+                            val slope = (newCost - originalCost) / distance
+                            neuron.costGradientWeights[i] = slope
 
-                neuron.bias += distance
-                val newCost = averageCost(trainingData)
-                val slope = (newCost - originalCost) / distance
-                neuron.costGradientBias = slope
-                neuron.bias -= distance
+                            //weights[i] -= distance // Reset weight to not throw of next calculations
+                        })
+                    }
+
+                    neuronJobs.add(coroutineScope.async {
+                        val modifiableNetwork = copy() // Make independent copy to not throw of other calculations
+                        val neuron = modifiableNetwork.layers[layerIndex].neurons[neuronIndex]
+
+                        neuron.bias += distance
+                        val newCost = modifiableNetwork.averageCost(trainingData)
+                        val slope = (newCost - originalCost) / distance
+                        neuron.costGradientBias = slope
+                        //neuron.bias -= distance
+                    })
+
+                    awaitAll(*neuronJobs.toTypedArray())
+
+                    progressBar.step()
+                    progressBar.refresh()
+                })
             }
         }
+        awaitAll(*jobs.toTypedArray())
 
         layers
             .flatMap { it.neurons.toList() }
             .forEach { it.applyGradients(learnRate) }
+        progressBar.close()
     }
+
+
+    fun copy() = NeuronNetwork(
+        this.inputs,
+        this.layers.toMutableList()
+    )
 
 }

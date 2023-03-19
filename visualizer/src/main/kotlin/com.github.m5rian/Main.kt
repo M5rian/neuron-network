@@ -7,7 +7,8 @@ import loaders.CustomDataLoader
 
 suspend fun main() {
     val trainingSamples = CustomDataLoader("custom-data").loadSamples()
-    val neuronNetwork = NeuronNetwork.fromLayerSizes(2, 4, 2, 3, 2)
+    //val neuronNetwork = NeuronNetwork.fromLayerSizes(2, 4, 2, 3, 2)
+    val neuronNetwork = NeuronNetwork.fromLayerSizes(2, 3, 2)
 
     val visualizer = Visualizer2d(neuronNetwork, 0..1100, 0..800)
     visualizer.dataPoints(trainingSamples) {
