@@ -1,13 +1,33 @@
 package com.github.m5rian
 
-fun main() {
+import NeuronNetwork
+
+
+var clearScreen = ""
+
+
+data class Num(val int: Int)
+
+suspend fun main() {
+    repeat(50) { clearScreen += "\r\n" }
+
+    val network = chooseNetwork()
+    networkActions(network)
+}
+
+private suspend fun networkActions(network: NeuronNetwork) {
+    println(clearScreen)
     println(
         """
-        Wähle aus:
-        (1) Load Data
-        (2) Train Data
+        What to do next?
+        (1) Predict
+        (2) Train
     """.trimIndent()
     )
-    val action = readln()
-    println(action)
+    val action = readln().toIntOrNull() ?: return networkActions(network)
+    return when (action) {
+        1    -> {}
+        2    -> train(network)
+        else -> networkActions(network)
+    }
 }
