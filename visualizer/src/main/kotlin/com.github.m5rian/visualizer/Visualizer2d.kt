@@ -34,7 +34,7 @@ class Visualizer2d(
     private val updateButton = JButton("Update!").apply { initializeUpdateButton(this) }
     private val learnOnceButton = JButton("Learn once").apply { initializeLearnOnceButton(this) }
     private val learnButton = JButton("Learn!").apply { initializeLearnButton(this) }
-    private var trainingSince: Long? = System.currentTimeMillis()
+    private var trainingSince: Long? = null
     private val trainingTimeLabel = JLabel("0:0m")
     private val lossLabel = JLabel("Loss = ?")
     private val correctLabel = JLabel("Correct = ?")
@@ -45,7 +45,7 @@ class Visualizer2d(
     }
 
     suspend fun open() = JFrame().apply {
-        add(JPanel().apply {
+        val panel = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
 
             add(updateButton)
@@ -72,7 +72,12 @@ class Visualizer2d(
 
             // Bias and weight settings
             inputRenderer.render(this)
-        })
+        }
+
+        val scrollPane = JScrollPane(panel)
+        scrollPane.verticalScrollBarPolicy = JScrollPane.VERTICAL_SCROLLBAR_ALWAYS
+
+        add(scrollPane)
         isVisible = true
     }
 
@@ -100,8 +105,10 @@ class Visualizer2d(
 
     private fun initializeLearnOnceButton(button: JButton) {
         button.addActionListener {
-            neuronNetwork.learn(normalizedTrainingData, 0.001)
-            coroutineScope.launch { rerender() }
+            coroutineScope.launch {
+                neuronNetwork.learn(normalizedTrainingData, 0.001)
+                rerender()
+            }
         }
     }
 
