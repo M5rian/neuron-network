@@ -7,5 +7,7 @@ dependencies {
 }
 
 tasks.withType<Jar> {
-    manifest { attributes["Main-Class"] = "com.github.m5rian.MainKt" }
+    manifest {
+        attributes["Main-Class"] = "com.github.m5rian.MainKt"
+    }
 }
